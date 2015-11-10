@@ -1,0 +1,200 @@
+<html>
+<script src="jquery.min.js"></script>
+<script src="keycodes.js"></script>
+<script src="mousetrap.min.js"></script>
+<script src="popup.js"></script>
+<style type="text/css">
+		body 
+		{ 
+			margin: 0;
+			background-color: #36b1c5;
+			font-family: nova,"Helvetica Neue",Helvetica,Arial,sans-serif;
+		    font-size: 12px;
+		    line-height: 1;
+		    color: #0e2c31;
+		    /* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#2eb0c6+0,53bdcd+100 */
+			background: #2eb0c6; /* Old browsers */
+			background: -moz-linear-gradient(top,  #2eb0c6 0%, #53bdcd 100%); /* FF3.6+ */
+			background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#2eb0c6), color-stop(100%,#53bdcd)); /* Chrome,Safari4+ */
+			background: -webkit-linear-gradient(top,  #2eb0c6 0%,#53bdcd 100%); /* Chrome10+,Safari5.1+ */
+			background: -o-linear-gradient(top,  #2eb0c6 0%,#53bdcd 100%); /* Opera 11.10+ */
+			background: -ms-linear-gradient(top,  #2eb0c6 0%,#53bdcd 100%); /* IE10+ */
+			background: linear-gradient(to bottom,  #2eb0c6 0%,#53bdcd 100%); /* W3C */
+			filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#2eb0c6', endColorstr='#53bdcd',GradientType=0 ); /* IE6-9 */
+
+		}
+		div 
+		{ 
+			
+		}
+		input 
+		{ 
+			border:0px;
+		}
+		
+		input[type=text]
+		{
+			width:24px;
+			background-color: rgba(255,255,255,0.45);
+		}
+		input[type=radio]
+		{
+			width:14px;
+    		height:14px;
+    		background-color: #fff;
+    		color: #fff;
+    		right:-5px;
+    		position: absolute;
+    		top:-5px;
+		}
+		input[type=checkbox]
+		{
+			width:15px;
+    		height:15px;
+    		background-color: #fff;
+    		color: #fff;
+    		right:-5px;
+    		position: absolute;
+    		top:-5px;
+		}
+		select
+		{
+			width:40px;
+    		height:15px;
+    		background-color: rgba(255,255,255,0.55);
+    		color: #000;
+    		right:0px;
+    		position: absolute;
+    		top:-5px;
+		}
+		input[name=input_quality]
+		{
+			margin:0px;
+			width:30px;
+			text-align: center;
+		}
+		input[name=input_filesize]
+		{
+			margin:0px;
+			width:30px;
+			text-align: center;
+		}
+		input[name=input_hotkey]
+		{
+			width:96px;
+		}
+		input[name=input_detection_id]
+		{
+			margin:0px;
+			width:80px;
+		}
+		.item
+		{
+			border-radius: 6px;
+			padding:3px 10px 3px 10px;
+			background-color: rgba(255,255,255,0.10);
+			margin-bottom:8px;
+			-webkit-box-shadow: inset 0px 0px 10px 5px rgba(0,0,0,.3);
+			-moz-box-shadow: inset 0px 0px 10px 5px rgba(255,255,255,.2);
+			box-shadow: inset 0px 0px 3px 3px rgba(0,0,0,.00);
+		}
+
+		#menu 
+		{ 
+			width:142px;
+			margin:-2px 12px 0px 12px;
+			height:364px;
+		}
+		.header 
+		{ 
+			font-size: 14px;
+			font-weight: bold;
+			margin-bottom:5px;
+			margin-top:3px;
+		}
+		.subheader 
+		{ 
+			margin:0px 0px 5px 0px;
+			position: relative;
+		}
+		.subheaderSlim
+		{
+			margin:0px 0px 2px 0px;
+			position: relative;
+		}
+		#logo
+		{
+			margin:12px 25px 15px 34px;
+		}
+		#version
+		{
+			position: absolute;
+			right:5px;
+			bottom:5px;
+			font-size: 10px;
+		    line-height: 1;
+		    opacity: .4;
+		}
+</style>
+<body margin='0' style='margin:0px'>
+	<img id='logo' src='bannerboy-logo.png' />
+	<div id='menu'>
+		<div class='item'>
+			<div class='header'>Output</div>
+			<div class='subheader'>
+				<label for="input_jpg">JPG </label>
+				<input type="radio" name="output" value="0" id='input_jpg' checked>
+			</div>
+			<div class='subheader'>
+				<label for="input_png">PNG </labeL>
+				<input type="radio" name="output" id='input_png' value="1">
+			</div>
+		</div>
+		<div id='holder_optimizing' class='item'>
+			<div class='header'>Optimizing </div>
+			<div class='subheader'>
+				<label for="radio_quality">Quality:
+				<input type="text" name="input_quality"  id='input_quality' maxlength="3"></label>
+				<input type="radio" name="optimizing" value="0" id='radio_quality' checked maxlength="3"  style='top:-1px'>
+			</div>
+			<div class='subheader'>
+				<label for="file_size">Filesize (kb):
+				<input type="text" name="input_filesize"  id='input_filesize'></label>
+				<input type="radio" name="optimizing" value="1" id='file_size' maxlength="3" style='top:-1px'>
+			</div>
+		</div>
+		<div class='item'>
+			<div class='header'>Detection</div>
+			<div class='subheader'>
+				<label for="input_id"># 
+				<input type="text" name="input_detection_id"  id='input_detection_id'></label>
+				<input type="radio" name="detection" value="0" id='input_id' checked style='top:-1px'>
+			</div>
+			<div class='subheader'>
+				<label for="input_div">First div in body</label>
+				<input type="radio" name="detection" value="1" id='input_div'>
+			</div>
+			<div class='subheader'>
+				<label for="input_auto">Pixels </label>
+				<input type="radio" name="detection" value="2" id='input_auto'>
+			</div>
+			<!--
+			<div class='subheader'>
+				<label for="input_none">Fullscreen </label>
+				<input type="radio" name="detection" value="3" id='input_none'>
+			</div>-->
+		</div>	
+		<div class='item'>
+			<div class='header'>File saving</div>
+			<div class='subheader'>Save as <input id='saveAs' type="checkbox" name="saveAs" value="0"></div>
+		</div>
+		<div class='item'>
+			<div class='header'>Hotkey</div>
+			<div class='subheader'>CTRL - SHIFT
+				<select id='select_hotkey'></select>
+				</div>
+		</div>
+	</div>
+	<div id='version'>Version</div>
+
+</html>
