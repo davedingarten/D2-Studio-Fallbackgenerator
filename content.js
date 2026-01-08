@@ -4,37 +4,6 @@ var _bannerWidth = 0;
 var _bannerHeight= 0;
 var _previousHotkey = '';
 
-function getById()
-{
-   var bannerDIV = document.getElementById(_options.detectionId);
-   if(bannerDIV) 
-    {
-       _bannerDIV = bannerDIV;
-       return true;
-    }
-   else return false;
-}
-
-function getByFirstDIV()
-{
-   var bannerDIV = document.body.children[0];
-   if(bannerDIV) 
-   {
-       if(bannerDIV.style.width && bannerDIV.style.height)
-        {
-            _bannerWidth = parseInt(bannerDIV.style.width);
-            _bannerHeight = parseInt(bannerDIV.style.height)
-            _bannerDIV = bannerDIV;
-            return true
-        }
-        else
-        {
-          return false
-        }
-    }
-   else return false;
-}
-
 function getPageInfo () 
 {
     _bannerWidth = 0;
@@ -43,22 +12,27 @@ function getPageInfo ()
 
     if(_options.detectionMode=='id')
     {
-       if(!getById())
-       {
-          //getByFirstDIV();
+       _bannerDIV = document.querySelector(_options.detectionId);
+       if (_bannerDIV) {
+           const styles = window.getComputedStyle(_bannerDIV);
+           _bannerWidth = parseInt(styles.width);
+           _bannerHeight = parseInt(styles.height);
        }
     }
-    else if(_options.detectionMode=='firstdiv')
+    if(_options.detectionMode=='firstdiv' || _bannerDIV==undefined && _options.detectionMode!='automatic')
     {
-        getByFirstDIV();
+        _bannerDIV = document.body.children[0];
+        if(_bannerDIV.style.width && _bannerDIV.style.height)
+        {
+            _bannerWidth = parseInt(_bannerDIV.style.width);
+            _bannerHeight = parseInt(_bannerDIV.style.height)
+        }
     }
-    else if(_options.detectionMode=='automatic')
+    if(_options.detectionMode=='automatic' || _bannerDIV==undefined)
     {
-        
+        // gets done in background.js
     }
    
-    console.log('_options.detectionMode: '+_options.detectionMode)
-    console.log('_bannerWidth: '+_bannerWidth)
     var isTransparent=false;
     var bkColorHex = document.body.style.backgroundColor;
    	if(!bkColorHex) 
@@ -66,6 +40,7 @@ function getPageInfo ()
    		//no backgroundcolor set so white
    		bkColorHex = "#ffffff";
    	}
+    console.log('bkColorHex'+bkColorHex)
    var bkColor=hexToRgb(bkColorHex);
    var currentUrl = window.location.href;
    var urlSplit = currentUrl.split('/');
@@ -82,9 +57,6 @@ function getPageInfo ()
       {
         suggestedFileName = urlSplit[urlSplit.length-1];
       }
-      
-      console.log('suggestedFileName'+suggestedFileName)
-      console.log('urlSplit'+urlSplit)
    }
    else 
    {
@@ -104,19 +76,17 @@ function getPageInfo ()
         parentFolder:parentFolder,
         suggestedFileName:suggestedFileName,
         currentUrl:currentUrl,
-        retina:isRetina(),
+        devicePixelRatio:window.devicePixelRatio,
         bgColor:bkColor,
         width:_bannerWidth,
         height:_bannerHeight}, function(response) 
         {
-    			console.log('message sent: '+response.status)
+    			 //console.log('message sent: '+response.status)
     	  });
 }
 
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) 
 {
-    console.log('request.action: '+request.action);
-
     if(request.action =='info')
     {
       for(var item in request.options)
@@ -159,25 +129,41 @@ function isRetina ()
 
 function setHotkey()
 {
-    if(_previousHotkey!="") 
+    if(_previousHotkey!="")
     {
-       Mousetrap.unbind('ctrl+shift+'+_previousHotkey.toString().toLowerCase());
+       Mousetrap.unbind('mod+shift+'+_previousHotkey.toString().toLowerCase());
     }
-    console.log('binding to: '+'ctrl+shift+'+_options.hotkey.toString().toLowerCase())
-    Mousetrap.bind('ctrl+shift+'+_options.hotkey.toString().toLowerCase(), function(e) {
-    chrome.runtime.sendMessage({
-        senderID:'content',
-        action:'screenshot'
-        }, function(response) 
+    var hotkey = _options.hotkey || 'S';
+    console.log('DD Studio: Binding hotkey Cmd/Ctrl+Shift+' + hotkey);
+    Mousetrap.bind('mod+shift+'+hotkey.toString().toLowerCase(), function(e) {
+        console.log('DD Studio: Hotkey pressed, taking screenshot');
+        chrome.runtime.sendMessage({
+            senderID:'content',
+            action:'screenshot'
+        }, function(response)
         {
-          console.log('message sent: '+response.status)
+            console.log('DD Studio: Screenshot message sent');
         });
-    return false;
+        return false;
     });
-    _previousHotkey = _options.hotkey;
+    _previousHotkey = hotkey;
 }
 
+// Initialize on page load
+(function init() {
+    // Set default hotkey immediately
+    _options.hotkey = 'S';
+    setHotkey();
 
-
-//getPageInfo();
+    // Request current options from background
+    chrome.runtime.sendMessage({
+        senderID: 'content',
+        action: 'getOptions'
+    }, function(response) {
+        if (response && response.options) {
+            _options = response.options;
+            setHotkey();
+        }
+    });
+})();
 

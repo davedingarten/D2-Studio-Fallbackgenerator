@@ -1,41 +1,50 @@
 <html>
-<script src="jquery.min.js"></script>
-<script src="keycodes.js"></script>
-<script src="mousetrap.min.js"></script>
 <script src="popup.js"></script>
 <style type="text/css">
 		body 
 		{ 
 			margin: 0;
-			background-color: #36b1c5;
 			font-family: nova,"Helvetica Neue",Helvetica,Arial,sans-serif;
-		    font-size: 12px;
+		    font-size: 13px;
+		    font-weight: normal;
 		    line-height: 1;
-		    color: #0e2c31;
-		    /* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#2eb0c6+0,53bdcd+100 */
-			background: #2eb0c6; /* Old browsers */
-			background: -moz-linear-gradient(top,  #2eb0c6 0%, #53bdcd 100%); /* FF3.6+ */
-			background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#2eb0c6), color-stop(100%,#53bdcd)); /* Chrome,Safari4+ */
-			background: -webkit-linear-gradient(top,  #2eb0c6 0%,#53bdcd 100%); /* Chrome10+,Safari5.1+ */
-			background: -o-linear-gradient(top,  #2eb0c6 0%,#53bdcd 100%); /* Opera 11.10+ */
-			background: -ms-linear-gradient(top,  #2eb0c6 0%,#53bdcd 100%); /* IE10+ */
+		    color: #2c2d2e;
+		    -webkit-font-smoothing: subpixel-antialiased;
+		    background: #FFFFFF; /* Old browsers */
 			background: linear-gradient(to bottom,  #2eb0c6 0%,#53bdcd 100%); /* W3C */
-			filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#2eb0c6', endColorstr='#53bdcd',GradientType=0 ); /* IE6-9 */
-
+			background: linear-gradient(to top,  rgba(46,176,198,0.85) 0%,rgba(46,176,198,0.85) 100%);
+			box-shadow: inset 0px 0px 13px 13px rgba(0,0,0,.05);
 		}
 		div 
 		{ 
 			
 		}
+		:focus {
+		  outline: 3px solid rgba(47,145,161,.3);
+		}
 		input 
 		{ 
 			border:0px;
 		}
-		
-		input[type=text]
+		::selection {
+  			background: #ffb7b7; /* WebKit/Blink Browsers */
+		}
+		input[type=number]::-webkit-inner-spin-button, 
+		input[type=number]::-webkit-outer-spin-button { 
+		  -webkit-appearance: none; 
+		  margin: 0; 
+		}
+		input[type=text],input[type=number]
 		{
+			font-weight: bold;
+			height:20px;
 			width:24px;
-			background-color: rgba(255,255,255,0.45);
+			background-color: rgba(255,255,255,0.3);
+			font-family: nova,"Helvetica Neue",Helvetica,Arial,sans-serif;
+		    font-size: 12px;
+		    line-height: 1;
+		    color: #0e2c31;
+		    box-shadow: inset 2px 2px 2px 2px rgba(0,0,0,.05);
 		}
 		input[type=radio]
 		{
@@ -60,12 +69,12 @@
 		select
 		{
 			width:40px;
-    		height:15px;
+    		height:18px;
     		background-color: rgba(255,255,255,0.55);
     		color: #000;
     		right:0px;
     		position: absolute;
-    		top:-5px;
+    		top:-2px;
 		}
 		input[name=input_quality]
 		{
@@ -87,44 +96,49 @@
 		{
 			margin:0px;
 			width:80px;
+			padding-left: 4px
 		}
 		.item
 		{
-			border-radius: 6px;
-			padding:3px 10px 3px 10px;
-			background-color: rgba(255,255,255,0.10);
-			margin-bottom:8px;
-			-webkit-box-shadow: inset 0px 0px 10px 5px rgba(0,0,0,.3);
-			-moz-box-shadow: inset 0px 0px 10px 5px rgba(255,255,255,.2);
-			box-shadow: inset 0px 0px 3px 3px rgba(0,0,0,.00);
+			border-radius: 4px;
+			padding:4px 11px 4px 11px;
+			margin-bottom:4px;
+			box-shadow: 0px 0px 9px 9px rgba(255,255,255,.1);
+
+			/* background: rgba(255,255,255,.3); Old browsers */
+			background: rgba(0,0,0,.01); /* Old browsers */
+			/*background: linear-gradient(to top,  #2eb0c6 0%,#53bdcd 100%);  W3C 
+			background: linear-gradient(to top,  rgba(46,176,198,0.07) 0%,rgba(83,189,205,0.07) 100%);*/
 		}
 
 		#menu 
 		{ 
-			width:142px;
-			margin:-2px 12px 0px 12px;
-			height:364px;
+			width:150px;
+			margin:-2px 10px 0px 10px;
+			height:434px;
+
 		}
 		.header 
 		{ 
-			font-size: 14px;
+			font-family: nova,"Helvetica Neue",Helvetica,Arial,sans-serif;
+			font-size: 15px;
 			font-weight: bold;
-			margin-bottom:5px;
-			margin-top:3px;
+			margin-bottom:7px;
+			margin-top:5px;
 		}
 		.subheader 
 		{ 
-			margin:0px 0px 5px 0px;
+			margin:0px 0px 6px 0px;
 			position: relative;
 		}
 		.subheaderSlim
 		{
-			margin:0px 0px 2px 0px;
+			margin:0px 0px 4px 0px;
 			position: relative;
 		}
 		#logo
 		{
-			margin:12px 25px 15px 34px;
+			margin:14px 0px 18px 18px;
 		}
 		#version
 		{
@@ -133,50 +147,122 @@
 			bottom:5px;
 			font-size: 10px;
 		    line-height: 1;
-		    opacity: .4;
+		    opacity: .5;
+		}
+		input[type="checkbox"] {
+		    display:none;
+		}
+		input[type="checkbox"] + label span {
+		   display: inline-block;
+		    width: 19px;
+		    height: 19px;
+		    margin: -3px 0px 0px 0px;
+		    vertical-align: middle;
+		    background: url(check_radio_sheet.png) left top no-repeat;
+		    cursor: pointer;
+		    position: absolute;
+		    right: -4px;
+		    opacity: 1;
+		}
+		input[type="checkbox"]:checked + label span {
+		    background:url(check_radio_sheet.png) -19px top no-repeat;
+		}
+
+		input[type="radio"] {
+		    display:none;
+		}
+		input[type="radio"] + label span {
+		    display: inline-block;
+		    width: 19px;
+		    height: 19px;
+		    margin: -4px 0px 0px 0px;
+		    vertical-align: middle;
+		    background: url(check_radio_sheet.png) -38px top no-repeat;
+		    cursor: pointer;
+		    position: absolute;
+		    right: -4px;
+		}
+
+		.radioCustom input[type="radio"] + label span {
+		    margin: 1px 0px 0px 0px;
+		}
+
+
+		input[type="radio"]:checked + label span {
+		    background:url(check_radio_sheet.png) -57px top no-repeat;
+		}
+
+		@font-face {
+		    font-family: nova;
+		    src: url(fonts/proximanova-regular-webfont.eot);
+		    src: url(fonts/proximanova-regular-webfont.eot?#iefix) format("embedded-opentype"), url(fonts/proximanova-regular-webfont.woff2) format("woff2"), url(fonts/proximanova-regular-webfont.woff) format("woff"), url(fonts/proximanova-regular-webfont.ttf) format("truetype"), url(fonts/proximanova-regular-webfont.svgproximanova-regular-webfont) format("svg");
+		    font-weight: 400;
+		    font-style: normal;
+		}
+		@font-face {
+		    font-family: nova;
+		    src: url(fonts/proximanova-bold-webfont.eot);
+		    src: url(fonts/proximanova-bold-webfont.eot?#iefix) format("embedded-opentype"), url(fonts/proximanova-bold-webfont.woff2) format("woff2"), url(fonts/proximanova-bold-webfont.woff) format("woff"), url(fonts/proximanova-bold-webfont.ttf) format("truetype"), url(fonts/proximanova-bold-webfont.svgproximanova-bold-webfont) format("svg");
+		    font-weight: 700;
+		    font-style: normal;
+		}
+		@font-face {
+		    font-family: nova;
+		    src: url(fonts/proximanova-black-webfont.eot);
+		    src: url(fonts/proximanova-black-webfont.eot?#iefix) format("embedded-opentype"), url(fonts/proximanova-black-webfont.woff2) format("woff2"), url(fonts/proximanova-black-webfont.woff) format("woff"), url(fonts/proximanova-black-webfont.ttf) format("truetype"), url(fonts/proximanova-black-webfont.svgproximanova-black-webfont) format("svg");
+		    font-weight: 900;
+		    font-style: normal;
+		}
+		@font-face {
+		    font-family: nova-con2;
+		    src: url(fonts/proximanova-regitalic-webfont.eot);
+		    src: url(fonts/proximanova-regitalic-webfont.eot?#iefix) format("embedded-opentype"), url(fonts/proximanova-regitalic-webfont.woff2) format("woff2"), url(fonts/proximanova-regitalic-webfont.woff) format("woff"), url(fonts/proximanova-regitalic-webfont.ttf) format("truetype"), url(fonts/proximanova-regitalic-webfont.svgproximanova-regitalic-webfont) format("svg");
+		    font-weight: 400;
+		    font-style: italic;
 		}
 </style>
 <body margin='0' style='margin:0px'>
-	<img id='logo' src='bannerboy-logo.png' />
+	<img id='logo' src='icon_128.png' />
 	<div id='menu'>
 		<div class='item'>
-			<div class='header'>Output</div>
+			<div class='header'>Image format</div>
 			<div class='subheader'>
-				<label for="input_jpg">JPG </label>
 				<input type="radio" name="output" value="0" id='input_jpg' checked>
+				<label for="input_jpg"><span></span>JPG </label>
 			</div>
 			<div class='subheader'>
-				<label for="input_png">PNG </labeL>
 				<input type="radio" name="output" id='input_png' value="1">
+				<label for="input_png"><span></span>PNG </labeL>
 			</div>
 		</div>
 		<div id='holder_optimizing' class='item'>
-			<div class='header'>Optimizing </div>
-			<div class='subheader'>
-				<label for="radio_quality">Quality:
-				<input type="text" name="input_quality"  id='input_quality' maxlength="3"></label>
+			<div class='header'>Optimize </div>
+			<div class='subheaderSlim radioCustom'>
+				<input type="number" name="input_quality"  id='input_quality' maxlength="3">
 				<input type="radio" name="optimizing" value="0" id='radio_quality' checked maxlength="3"  style='top:-1px'>
+				<label for="radio_quality"><span></span>Quality</label>
 			</div>
-			<div class='subheader'>
-				<label for="file_size">Filesize (kb):
-				<input type="text" name="input_filesize"  id='input_filesize'></label>
+			<div class='subheader radioCustom'>
+				
+				<input type="number" name="input_filesize"  id='input_filesize'>
 				<input type="radio" name="optimizing" value="1" id='file_size' maxlength="3" style='top:-1px'>
+				<label for="file_size"><span></span>Kb</label>
 			</div>
 		</div>
 		<div class='item'>
 			<div class='header'>Detection</div>
-			<div class='subheader'>
-				<label for="input_id"># 
-				<input type="text" name="input_detection_id"  id='input_detection_id'></label>
+			<div class='subheader radioCustom'>
+				<input type="text" name="input_detection_id"  id='input_detection_id'>
 				<input type="radio" name="detection" value="0" id='input_id' checked style='top:-1px'>
+				<label for="input_id"><span></span></label>
 			</div>
 			<div class='subheader'>
-				<label for="input_div">First div in body</label>
 				<input type="radio" name="detection" value="1" id='input_div'>
+				<label for="input_div"><span></span>First div in body</label>
 			</div>
 			<div class='subheader'>
-				<label for="input_auto">Pixels </label>
 				<input type="radio" name="detection" value="2" id='input_auto'>
+				<label for="input_auto"><span></span>Pixels </label>
 			</div>
 			<!--
 			<div class='subheader'>
@@ -186,7 +272,18 @@
 		</div>	
 		<div class='item'>
 			<div class='header'>File saving</div>
-			<div class='subheader'>Save as <input id='saveAs' type="checkbox" name="saveAs" value="0"></div>
+			<div class='subheader'>
+				<input id='saveAs' type="checkbox" name="saveAs" value="0">
+				<label for="saveAs"><span></span>Save as </label>
+			</div>
+			<div class='subheader'>
+				<input id='overwrite' type="checkbox" name="overwrite" value="0">
+				<label for="overwrite"><span></span>Overwrite </label>
+			</div>
+			<div class='subheader'>
+				<input id='retinaMode' type="checkbox" name="retinaMode" value="0">
+				<label for="retinaMode"><span></span>Retina (2x) </label>
+			</div>
 		</div>
 		<div class='item'>
 			<div class='header'>Hotkey</div>

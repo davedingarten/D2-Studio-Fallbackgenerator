@@ -1,345 +1,279 @@
-var _id = 100;
-var _viewTabUrl;
-var _targetId = null;
-var _retina
-var _isTransparent = false;
-var _bgColor;
-var _currentUrl;
-var _lastDownloadId;
-var _lastFilename='';
-var _imgWidth = 0;
-var _imgHeight= 0;;
-var _screenshotUrl;
-var _manifest = chrome.runtime.getManifest();
-var _version = _manifest.version;
+// Background service worker for Manifest V3
+// Canvas operations are handled by offscreen.js
 
-var _outputModes = [
-                    {type:'JPG',id:0},
-                    {type:'PNG',id:1}
-]
-var _detectionModes = [
-    {type:'id',id:0},
-    {type:'firstdiv',id:1},
-    {type:'automatic',id:2},
-    {type:'none',id:3}
-]
+const OUTPUT_MODES = [
+  { type: 'JPG', id: 0 },
+  { type: 'PNG', id: 1 }
+];
 
-var _optimizingModes = [
-    {type:'quality',id:0},
-    {type:'filesize',id:1}
-]
+const DETECTION_MODES = [
+  { type: 'id', id: 0 },
+  { type: 'firstdiv', id: 1 },
+  { type: 'automatic', id: 2 },
+  { type: 'none', id: 3 }
+];
 
-var _options = {
-    optimizingMode:_optimizingModes[0].type,
-    maxFileSize:0,
-    saveAs:false,
-    detectionId:'banner',
-    outputMode:_outputModes[0].type,
-    quality:90,
-    detectionMode:_detectionModes[0].type,
-    hotkey:'S',    
-    retina:false,
-    suggestedFileName:'',
-    suggestedFileNameDefault:'fallback'
+const OPTIMIZING_MODES = [
+  { type: 'quality', id: 0 },
+  { type: 'filesize', id: 1 }
+];
+
+const DEFAULT_OPTIONS = {
+  overwrite: true,
+  optimizingMode: OPTIMIZING_MODES[0].type,
+  maxFileSize: 39,
+  saveAs: false,
+  detectionId: '#banner',
+  outputMode: OUTPUT_MODES[0].type,
+  quality: 90,
+  detectionMode: DETECTION_MODES[0].type,
+  hotkey: 'S',
+  devicePixelRatio: 1,
+  retinaMode: false,
+  suggestedFileName: '',
+  suggestedFileNameDefault: 'fallback'
 };
 
-chrome.tabs.onUpdated.addListener(function listener(tabId, changedProps) 
-{
-    console.log('tab updated: '+tabId)
-    
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) 
-   {
-        if(tabs[0].id==tabId)
-        {
-            sendNewHotkey();
-        }
-   })
+let _options = { ...DEFAULT_OPTIONS };
+let _lastDownloadId = null;
+let _lastFilename = '';
+let _creatingOffscreen = false;
+
+// Notification helper
+function showNotification(title, message, isError = false) {
+  const notificationId = 'dd-studio-' + Date.now();
+  console.log('DD Studio: Creating notification', title, message);
+
+  chrome.notifications.create(notificationId, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icon_128.png'),
+    title: title,
+    message: message
+  }, (id) => {
+    if (chrome.runtime.lastError) {
+      console.error('DD Studio: Notification error', chrome.runtime.lastError);
+    } else {
+      console.log('DD Studio: Notification created', id);
+    }
+  });
+}
+
+// Load options from storage on startup
+chrome.storage.local.get(['options'], (result) => {
+  if (result.options) {
+    _options = { ...DEFAULT_OPTIONS, ...result.options };
+  }
 });
 
-// Listen for a click on the camera icon. On that click, take a screenshot.
-chrome.browserAction.onClicked.addListener(function() 
-{
-    chrome.contextMenus.removeAll();
-    chrome.contextMenus.create({
-          title: "first",
-          contexts: ["browser_action"],
-          onclick: function() {
-            alert('first');
-          }
+// Save options to storage
+function saveOptions() {
+  chrome.storage.local.set({ options: _options });
+}
+
+// Offscreen document management
+async function setupOffscreenDocument() {
+  const offscreenUrl = chrome.runtime.getURL('offscreen.html');
+
+  // Check if offscreen document already exists
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [offscreenUrl]
+  });
+
+  if (existingContexts.length > 0) {
+    return;
+  }
+
+  // Prevent race condition
+  if (_creatingOffscreen) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return setupOffscreenDocument();
+  }
+
+  _creatingOffscreen = true;
+  try {
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: ['BLOBS'],
+      justification: 'Process screenshot images and convert to blob for download'
     });
-    //startScreenshot();
+    console.log('DD Studio: Offscreen document created successfully');
+    // Wait a bit for the document to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } catch (error) {
+    // Document might already exist
+    console.log('DD Studio: Offscreen document creation:', error.message);
+  }
+  _creatingOffscreen = false;
+}
+
+// Listen for tab updates to send hotkey
+chrome.tabs.onUpdated.addListener((tabId, changedProps) => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0] && tabs[0].id === tabId) {
+      sendNewHotkey();
+    }
+  });
 });
 
-function startScreenshot()
-{
-    console.log('startscreenshot')
-     //get active page info
-   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) 
-   {
-      chrome.tabs.sendMessage(tabs[0].id, {action: "info",options:_options}, function(response) 
-      {
-            console.log('message sent');
-            console.log('_options.width: '+_options.width)
-            console.log('_options.height: '+_options.height)
+// Listen for action click (toolbar icon)
+chrome.action.onClicked.addListener(() => {
+  // The popup handles this now
+});
 
-           //make screenshot
-            var type = {format:'jpeg',quality:90};
-            var type = {format:'png'};
-
-
-            chrome.tabs.captureVisibleTab(null,type,function(screenshotUrl) 
-            {
-                _screenshotUrl = screenshotUrl;
-                if(_options.width==0||_options.height==0)
-                {
-                    //no width or height given so detecting border
-                    var img = new Image();
-                    img.onload = function() 
-                    {
-                        var canvas = document.createElement('canvas');
-                        var canvasWidth = img.width
-                        var canvasHeight = img.height
-                        canvas.width = canvasWidth;
-                        canvas.height = canvasHeight;
-
-                        var ctx = canvas.getContext('2d');
-                        ctx.drawImage(img,0,0,canvasWidth,canvasHeight);
-                        var imgData=ctx.getImageData(0,0,canvasWidth,canvasHeight);
-                        var data=imgData.data;
-                        var pos = findEdge(data,canvasWidth,canvasHeight);
-                        if(!pos.valid){return;}
-                        var boundingBox = findBoundary(pos,data,canvasWidth,canvasHeight);
-                        if(_options.retina)
-                        {
-                            boundingBox.x = Math.ceil(boundingBox.x/2);
-                            boundingBox.y = Math.ceil(boundingBox.y/2);
-                            boundingBox.width = Math.ceil(boundingBox.width/2);
-                            boundingBox.height = Math.ceil(boundingBox.height/2);
-                        }
-                        cropData(_screenshotUrl,{x:boundingBox.x,y:boundingBox.y,w:boundingBox.width,h:boundingBox.height},onCropComplete);
-                     };            
-                    img.src = _screenshotUrl;
-                }
-                else
-                {
-                    cropData(_screenshotUrl,{x:0,y:0,w:_options.width,h:_options.height},onCropComplete);
-                }        
-            });
+// Message handler
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.senderID === 'content') {
+    if (request.action === 'info') {
+      for (const key in request) {
+        _options[key] = request[key];
+      }
+      sendResponse({ status: 'ok' });
+    } else if (request.action === 'screenshot') {
+      console.log('DD Studio: Screenshot requested from content script');
+      startScreenshot();
+      sendResponse({ status: 'ok' });
+    } else if (request.action === 'getOptions') {
+      sendResponse({
+        options: _options,
+        version: chrome.runtime.getManifest().version
       });
-    });
-
-   
-}
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) 
-{
-    if(request.senderID=='content')
-    {
-        if(request.action=='info')
-        {
-            for(var key in request)
-            {
-              _options[key] = request[key];
-            }
-        }
-        else if(request.action=='screenshot')
-        {
-            startScreenshot();
-        }
     }
-    else if(request.senderID=='popup')
-    {
-        if(request.action=='options')
-        {
-            if(_options.hotkey!=request.options.hotkey)
-            {
-                sendNewHotkey()
-            }
-            for(var key in request.options)
-            {   
-                _options[key] = request.options[key];
-            }
-        }
+  } else if (request.senderID === 'popup') {
+    if (request.action === 'options') {
+      if (_options.hotkey !== request.options.hotkey) {
+        _options.hotkey = request.options.hotkey;
+        sendNewHotkey();
+      }
+      for (const key in request.options) {
+        _options[key] = request.options[key];
+      }
+      saveOptions();
+      sendResponse({ status: 'ok' });
+    } else if (request.action === 'getOptions') {
+      sendResponse({
+        options: _options,
+        outputModes: OUTPUT_MODES,
+        detectionModes: DETECTION_MODES,
+        optimizingModes: OPTIMIZING_MODES,
+        version: chrome.runtime.getManifest().version
+      });
     }
-    
-    sendResponse({status: "ok"});   
+  }
+  return true; // Keep message channel open for async responses
 });
 
-function sendNewHotkey()
-{
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) 
-   {
-          chrome.tabs.sendMessage(tabs[0].id, {action: "hotkey",hotkey:_options.hotkey}, function(response) 
-          {
-            for(var item in response)
-            {
-                console.log(item +"  "+response[item])
-            }
-                //console.log(response)
-                console.log('hotkey sent2')
-          });
-    });
+// Send hotkey to content script
+function sendNewHotkey() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0]) {
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'hotkey',
+        hotkey: _options.hotkey
+      }).catch(() => {
+        // Tab might not have content script loaded
+      });
+    }
+  });
 }
 
-
-chrome.commands.onCommand.addListener(function (command) {
-    if (command === "save") {
-        alert("save");
-    }
+// Keyboard command handler
+chrome.commands.onCommand.addListener((command) => {
+  if (command === 'save') {
+    startScreenshot();
+  }
 });
 
+// Main screenshot function
+async function startScreenshot() {
+  console.log('DD Studio: startScreenshot called');
+  try {
+    // Get active tab info
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    console.log('DD Studio: Active tab:', tabs[0]?.url);
+    if (!tabs[0]) return;
 
-function onCropComplete(dataURL)
-{
-    var fileName
-   
-    if(_options.suggestedFileName=='')
-    {
-        fileName = _options.suggestedFileNameDefault+'_'+_imgWidth+'x'+_imgHeight+'.'+_options.outputMode.toLowerCase();
+    // Request page info from content script
+    try {
+      await chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'info',
+        options: _options
+      });
+    } catch (error) {
+      console.log('Content script not available');
     }
-    else
-    {
-        fileName = _options.suggestedFileName+'.'+_options.outputMode.toLowerCase();
-    }   
-    
-    if(_lastDownloadId && _lastFilename==fileName)
-    {
-         chrome.downloads.removeFile(_lastDownloadId, function (arrayItems)
-         {
-            console.log('deleted')
-         })
+
+    // Small delay to allow content script to respond
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Capture screenshot
+    const screenshotUrl = await chrome.tabs.captureVisibleTab(null, { format: 'png' });
+
+    // Setup offscreen document
+    await setupOffscreenDocument();
+
+    // Process screenshot in offscreen document
+    const needsAutoDetect = _options.width === 0 || _options.height === 0;
+
+    const result = await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      action: 'processScreenshot',
+      data: {
+        screenshotUrl,
+        options: _options,
+        needsAutoDetect
+      }
+    });
+
+    if (result.error) {
+      console.error('Screenshot processing error:', result.error);
+      showNotification('Screenshot Failed', result.error, true);
+      return;
     }
-    _lastFilename = fileName;
-    
-    console.log('_options.saveAs'+_options.saveAs)
-    chrome.downloads.download({
-          url: dataURL,
-          filename: fileName,
-          saveAs:_options.saveAs
-        },
-        function(downloadId)
-        {
-            // on success
-            _lastDownloadId = downloadId;
-        });
+
+    // Download the processed image
+    onCropComplete(result.dataURL, result.imgWidth, result.imgHeight);
+
+  } catch (error) {
+    console.error('Screenshot error:', error);
+    showNotification('Screenshot Failed', error.message || 'Unknown error', true);
+  }
 }
 
-function cropData(str, coords,callback) {
-    var img = new Image();
-    _imgWidth = coords.w;
-    _imgHeight = coords.h;
+// Handle download completion
+function onCropComplete(dataURL, imgWidth, imgHeight) {
+  let fileName;
 
-    console.log('cropData ///  _imgWidth: '+_imgWidth+'   _imgHeight: '+_imgHeight)
+  if (_options.suggestedFileName === '') {
+    fileName = `${_options.suggestedFileNameDefault}_${imgWidth}x${imgHeight}.${_options.outputMode.toLowerCase()}`;
+  } else {
+    fileName = `${_options.suggestedFileName}.${_options.outputMode.toLowerCase()}`;
+  }
 
-    img.onload = function() 
-    {
-        var canvas = document.createElement('canvas');
-        canvas.width = coords.w;
-        canvas.height = coords.h;
-        var ctx = canvas.getContext('2d');
-        
-        console.log('_options.retina'+_options.retina)
-        if(_options.retina==true)
-        {
-            ctx.scale(.5,.5);
-            ctx.drawImage(img, coords.x, coords.y, coords.w*2, coords.h*2, 0, 0, coords.w*2, coords.h*2);
-        }
-        else
-        {
-            ctx.scale(1,1);
-            ctx.drawImage(img, coords.x, coords.y, coords.w, coords.h, 0, 0, coords.w, coords.h);
-        }
-        //alert(_options.quality)
-        console.log('_options.quality: '+_options.quality)
+  // Handle overwrite
+  if (_options.overwrite && _lastDownloadId && _lastFilename === fileName) {
+    chrome.downloads.removeFile(_lastDownloadId, () => {
+      // File removed
+    });
+  }
 
-        var imgType 
-        console.log('_options.outputMode'+_options.outputMode)
-        if(_options.outputMode=='JPG')
-        {
-            imgType = 'image/jpeg';
-        }
-        else if(_options.outputMode=='PNG')
-        {
-            imgType = 'image/png';
-        }
-        var fileSize;
-        var tempQuality = _options.quality;;
+  _lastFilename = fileName;
 
-        if(_options.outputMode=='JPG')
-        {
-            if(_options.optimizingMode=='filesize')
-            {
-                canvas.toBlob(function(blob){
-                    fileSize = blob.size/1000;
-                },"image/jpeg", _options.quality/100);
-
-                console.log('fileSize before: '+fileSize)
-
-                var tempQuality = _options.quality;
-                var security = 0
-                while(fileSize>_options.maxFileSize)
-                {
-                    tempQuality-=1;
-                    security++;
-                    if(security>100) break;
-                    if(tempQuality<1) break;
-                    canvas.toBlob(function(blob)
-                    {
-                       fileSize = blob.size/1000;
-                    },"image/jpeg", tempQuality/100);
-                    console.log('fileSize after: '+fileSize)
-                }
-            }
-            else if(_options.optimizingMode=='quality')
-            {
-                
-            }
-        }
-        var dataURL = canvas.toDataURL(imgType,tempQuality/100);
-        callback(dataURL);
-      };    
-    img.src = str;
-}
-
-function xyIsInImage(data,x,y,cw,ch)
-{
-    // find the starting index of the r,g,b,a of pixel x,y
-    var start=(y*cw+x)*4;
-    if(_isTransparent){
-        return(data[start+3]>25);
-    }else{
-        var r=data[start+0];
-        var g=data[start+1];
-        var b=data[start+2];
-        var a=data[start+3];  // pixel alpha (opacity)
-        var deltaR=Math.abs(_options.bgColor.r-r);
-        var deltaG=Math.abs(_options.bgColor.g-g);
-        var deltaB=Math.abs(_options.bgColor.b-b);
-        return(!(deltaR<5 && deltaG<5 && deltaB<5 && a>25));
+  chrome.downloads.download({
+    url: dataURL,
+    filename: fileName,
+    saveAs: _options.saveAs
+  }, (downloadId) => {
+    _lastDownloadId = downloadId;
+    if (downloadId) {
+      showNotification('Screenshot Saved', `${fileName} (${imgWidth}x${imgHeight})`);
+    } else {
+      showNotification('Download Failed', 'Could not save the screenshot', true);
     }
+  });
 }
 
-function findBoundary(pos,data,cw,ch)
-{
-    var x0=x1=pos.x;
-    var y0=y1=pos.y;
-    while(y1<=ch && xyIsInImage(data,x1,y1,cw,ch)){y1++;}
-    var x2=x1;
-    var y2=y1-1;
-    while(x2<=cw && xyIsInImage(data,x2,y2,cw,ch)){x2++;}
-    return({x:x0,y:y0,width:x2-x0,height:y2-y0+1});
-}
-
-function findEdge(data,cw,ch)
-{
-    for(var y=0;y<ch;y++)
-    {
-        for(var x=0;x<cw;x++)
-        {
-            if(xyIsInImage(data,x,y,cw,ch))
-            {
-                return({x:x,y:y,valid:true});
-            }
-        }
-    }
-    return({x:-100,y:-100,valid:false});
-}
+// Export for popup access via messaging
+self.OUTPUT_MODES = OUTPUT_MODES;
+self.DETECTION_MODES = DETECTION_MODES;
+self.OPTIMIZING_MODES = OPTIMIZING_MODES;
