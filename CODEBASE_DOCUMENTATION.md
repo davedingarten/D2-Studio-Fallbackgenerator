@@ -32,7 +32,6 @@ The extension consists of four main JavaScript modules that communicate via Chro
 ├── popup.html                    # Settings UI
 ├── popup.js                      # Settings controller
 ├── canvas-to-blob.js            # Canvas to Blob polyfill library
-├── jquery.min.js                # jQuery library
 ├── mousetrap.min.js             # Keyboard shortcut library
 ├── fonts/                       # Proxima Nova font family
 │   ├── proximanova-regular-webfont.woff2
@@ -44,14 +43,8 @@ The extension consists of four main JavaScript modules that communicate via Chro
 ├── icon_48.png                  # Extension page icon (48px)
 ├── icon_128.png                 # Chrome Web Store icon (128px)
 ├── check_radio_sheet.png        # Custom checkbox/radio sprites
-└── Legacy files (can be removed):
-    ├── icheck.min.js            # Unused
-    ├── keycodes.js              # Unused
-    ├── screenshot.html          # Unused
-    ├── screenshot.js            # Unused
-    ├── bannerboy-logo.png       # Old logo
-    ├── camera_*.png             # Old icons
-    └── white.png                # Unused
+├── README.md                    # Project documentation
+└── CODEBASE_DOCUMENTATION.md    # Technical documentation
 ```
 
 ## Detailed Component Analysis
@@ -349,9 +342,10 @@ DEFAULT_OPTIONS = {
 ## Dependencies
 
 ### Runtime Libraries:
-- jQuery (minified) - DOM manipulation
 - Mousetrap - Keyboard shortcut binding
 - canvas-to-blob.js - Canvas to Blob polyfill
+
+**Note:** jQuery has been removed. All DOM manipulation uses vanilla JavaScript.
 
 ### Assets:
 - Proxima Nova font family (woff2)
@@ -361,7 +355,20 @@ DEFAULT_OPTIONS = {
 
 ## Changelog
 
-### Version 1.0 (Current)
+### Version 1.1 (Current)
+- Removed jQuery dependency (~85KB reduction)
+- Removed unused legacy files (icheck.min.js, keycodes.js, screenshot.*, camera_*.png, etc.)
+- Added DEBUG flag for conditional logging (disabled by default)
+- Modernized all JavaScript to ES6+ syntax:
+  - Replaced `var` with `const`/`let`
+  - Using template literals
+  - Using arrow functions
+  - Using optional chaining (`?.`) and nullish coalescing (`??`)
+  - Using `Object.assign()` and array methods
+- Added toast notifications for success/error feedback
+- Created README.md for GitHub
+
+### Version 1.0
 - Migrated from Manifest V2 to Manifest V3
 - Added offscreen document for canvas operations
 - Replaced `chrome.browserAction` with `chrome.action`
