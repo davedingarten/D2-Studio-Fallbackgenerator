@@ -1,22 +1,22 @@
 // Offscreen document for handling canvas operations
 // Service workers don't have DOM access, so we use this offscreen document
 
-console.log('DD Studio: Offscreen document loaded');
+const DEBUG = false;
+const log = DEBUG ? console.log.bind(console, '[DD Studio Offscreen]') : () => {};
+const logError = console.error.bind(console, '[DD Studio Offscreen]');
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('DD Studio Offscreen: Received message', request.action, request.target);
-
   if (request.target !== 'offscreen') return;
 
   if (request.action === 'processScreenshot') {
-    console.log('DD Studio Offscreen: Processing screenshot');
+    log('Processing screenshot');
     processScreenshot(request.data)
       .then(result => {
-        console.log('DD Studio Offscreen: Screenshot processed successfully');
+        log('Screenshot processed successfully');
         sendResponse(result);
       })
       .catch(error => {
-        console.error('DD Studio Offscreen: Error processing screenshot', error);
+        logError('Error processing screenshot', error);
         sendResponse({ error: error.message });
       });
     return true; // Keep the message channel open for async response

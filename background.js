@@ -1,6 +1,10 @@
 // Background service worker for Manifest V3
 // Canvas operations are handled by offscreen.js
 
+const DEBUG = false;
+const log = DEBUG ? console.log.bind(console, '[DD Studio]') : () => {};
+const logError = console.error.bind(console, '[DD Studio]');
+
 const OUTPUT_MODES = [
   { type: 'JPG', id: 0 },
   { type: 'PNG', id: 1 }
@@ -42,7 +46,7 @@ let _creatingOffscreen = false;
 // Notification helper
 function showNotification(title, message, isError = false) {
   const notificationId = 'dd-studio-' + Date.now();
-  console.log('DD Studio: Creating notification', title, message);
+  log('Creating notification', title, message);
 
   chrome.notifications.create(notificationId, {
     type: 'basic',
@@ -51,9 +55,9 @@ function showNotification(title, message, isError = false) {
     message: message
   }, (id) => {
     if (chrome.runtime.lastError) {
-      console.error('DD Studio: Notification error', chrome.runtime.lastError);
+      logError('Notification error', chrome.runtime.lastError);
     } else {
-      console.log('DD Studio: Notification created', id);
+      log('Notification created', id);
     }
   });
 }
@@ -97,12 +101,12 @@ async function setupOffscreenDocument() {
       reasons: ['BLOBS'],
       justification: 'Process screenshot images and convert to blob for download'
     });
-    console.log('DD Studio: Offscreen document created successfully');
+    log('Offscreen document created successfully');
     // Wait a bit for the document to initialize
     await new Promise(resolve => setTimeout(resolve, 100));
   } catch (error) {
     // Document might already exist
-    console.log('DD Studio: Offscreen document creation:', error.message);
+    log('Offscreen document creation:', error.message);
   }
   _creatingOffscreen = false;
 }
@@ -130,7 +134,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
       sendResponse({ status: 'ok' });
     } else if (request.action === 'screenshot') {
-      console.log('DD Studio: Screenshot requested from content script');
+      log('Screenshot requested from content script');
       startScreenshot();
       sendResponse({ status: 'ok' });
     } else if (request.action === 'getOptions') {
@@ -186,11 +190,11 @@ chrome.commands.onCommand.addListener((command) => {
 
 // Main screenshot function
 async function startScreenshot() {
-  console.log('DD Studio: startScreenshot called');
+  log('startScreenshot called');
   try {
     // Get active tab info
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    console.log('DD Studio: Active tab:', tabs[0]?.url);
+    log('Active tab:', tabs[0]?.url);
     if (!tabs[0]) return;
 
     // Request page info from content script
@@ -200,7 +204,7 @@ async function startScreenshot() {
         options: _options
       });
     } catch (error) {
-      console.log('Content script not available');
+      log('Content script not available');
     }
 
     // Small delay to allow content script to respond
@@ -226,7 +230,7 @@ async function startScreenshot() {
     });
 
     if (result.error) {
-      console.error('Screenshot processing error:', result.error);
+      logError('Screenshot processing error:', result.error);
       showNotification('Screenshot Failed', result.error, true);
       return;
     }
@@ -235,7 +239,7 @@ async function startScreenshot() {
     onCropComplete(result.dataURL, result.imgWidth, result.imgHeight);
 
   } catch (error) {
-    console.error('Screenshot error:', error);
+    logError('Screenshot error:', error);
     showNotification('Screenshot Failed', error.message || 'Unknown error', true);
   }
 }

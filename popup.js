@@ -1,6 +1,7 @@
 // Helper functions
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
+const logError = console.error.bind(console, '[DD Studio]');
 
 let _options = {};
 let _outputModes = [];
@@ -21,7 +22,7 @@ function init() {
     action: 'getOptions'
   }, (response) => {
     if (!response) {
-      console.error('Failed to get options from background');
+      logError('Failed to get options from background');
       return;
     }
 

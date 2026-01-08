@@ -1,3 +1,6 @@
+const DEBUG = false;
+const log = DEBUG ? console.log.bind(console, '[DD Studio]') : () => {};
+
 var _options = {};
 var _bannerDIV;
 var _bannerWidth = 0;
@@ -40,7 +43,7 @@ function getPageInfo ()
    		//no backgroundcolor set so white
    		bkColorHex = "#ffffff";
    	}
-    console.log('bkColorHex'+bkColorHex)
+    log('bkColorHex: ' + bkColorHex);
    var bkColor=hexToRgb(bkColorHex);
    var currentUrl = window.location.href;
    var urlSplit = currentUrl.split('/');
@@ -134,15 +137,14 @@ function setHotkey()
        Mousetrap.unbind('mod+shift+'+_previousHotkey.toString().toLowerCase());
     }
     var hotkey = _options.hotkey || 'S';
-    console.log('DD Studio: Binding hotkey Cmd/Ctrl+Shift+' + hotkey);
-    Mousetrap.bind('mod+shift+'+hotkey.toString().toLowerCase(), function(e) {
-        console.log('DD Studio: Hotkey pressed, taking screenshot');
+    log('Binding hotkey Cmd/Ctrl+Shift+' + hotkey);
+    Mousetrap.bind('mod+shift+'+hotkey.toString().toLowerCase(), function() {
+        log('Hotkey pressed, taking screenshot');
         chrome.runtime.sendMessage({
             senderID:'content',
             action:'screenshot'
-        }, function(response)
-        {
-            console.log('DD Studio: Screenshot message sent');
+        }, function() {
+            log('Screenshot message sent');
         });
         return false;
     });
