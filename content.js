@@ -32,7 +32,6 @@ function getPageInfo() {
   // Automatic mode is handled in offscreen.js
 
   let bkColorHex = document.body.style.backgroundColor || '#ffffff';
-  log(`bkColorHex: ${bkColorHex}`);
 
   const bkColor = hexToRgb(bkColorHex);
   const currentUrl = window.location.href;

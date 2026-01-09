@@ -5,6 +5,31 @@ const DEBUG = false;
 const log = DEBUG ? console.log.bind(console, '[DD Studio Offscreen]') : () => {};
 const logError = console.error.bind(console, '[DD Studio Offscreen]');
 
+// jSquash WASM JPEG encoder - much faster than canvas.toBlob()
+let jSquashEncode = null;
+let jSquashInitPromise = null;
+
+async function initJSquash() {
+  if (jSquashEncode) return jSquashEncode;
+  if (jSquashInitPromise) return jSquashInitPromise;
+
+  jSquashInitPromise = (async () => {
+    try {
+      log('Loading jSquash WASM encoder...');
+      const startTime = performance.now();
+      const module = await import('./jsquash/encode.js');
+      jSquashEncode = module.default;
+      log(`jSquash loaded in ${(performance.now() - startTime).toFixed(0)}ms`);
+      return jSquashEncode;
+    } catch (error) {
+      logError('Failed to load jSquash, falling back to toBlob:', error);
+      return null;
+    }
+  })();
+
+  return jSquashInitPromise;
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.target !== 'offscreen') return;
 
@@ -129,8 +154,14 @@ function cropAndProcess(img, coords, options, effectivePixelRatio, resolve, reje
         resolve({ dataURL, imgWidth, imgHeight });
       });
     } else if (options.optimizingMode === 'quality') {
-      const dataURL = canvas.toDataURL(imgType, options.quality / 100);
-      resolve({ dataURL, imgWidth, imgHeight });
+      // Use jSquash for quality mode too (faster + better compression)
+      encodeWithJSquash(canvas, options.quality).then(dataURL => {
+        resolve({ dataURL, imgWidth, imgHeight });
+      }).catch(() => {
+        // Fallback to toDataURL if jSquash fails
+        const dataURL = canvas.toDataURL(imgType, options.quality / 100);
+        resolve({ dataURL, imgWidth, imgHeight });
+      });
     }
   } else {
     // PNG
@@ -139,80 +170,154 @@ function cropAndProcess(img, coords, options, effectivePixelRatio, resolve, reje
   }
 }
 
-// Binary search to find highest quality that fits under maxFileSize
-// Guarantees file will NOT exceed maxFileSize while maximizing quality
+// Single encode with jSquash for quality mode
+async function encodeWithJSquash(canvas, quality) {
+  const encode = await initJSquash();
+  if (!encode) {
+    throw new Error('jSquash not available');
+  }
+
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  log(`Encoding with jSquash at quality=${quality}`);
+  const startTime = performance.now();
+  const buffer = await encode(imageData, { quality });
+  const elapsed = performance.now() - startTime;
+
+  // Convert ArrayBuffer to data URL
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+  const dataURL = `data:image/jpeg;base64,${base64}`;
+
+  log(`Encoded in ${elapsed.toFixed(0)}ms, size=${(buffer.byteLength / 1000).toFixed(1)}KB`);
+  return dataURL;
+}
+
+// Two-phase search: coarse (steps of 20) then fine binary search
+// Uses jSquash WASM encoder for speed (~50ms vs ~1000ms per iteration)
 async function checkSize(canvas, _tempQuality, _security, imgType, options, callback) {
   const targetSize = options.maxFileSize;
+  const startTime = performance.now();
+  const elapsed = () => `${(performance.now() - startTime).toFixed(0)}ms`;
 
-  // Helper to get blob at a given quality
-  const getBlob = (quality) => {
-    return new Promise(resolve => {
-      canvas.toBlob(blob => {
-        resolve({ blob, size: blob.size / 1000, quality });
-      }, imgType, quality / 100);
-    });
+  log(`[${elapsed()}] Starting filesize optimization, target: ${targetSize}KB`);
+
+  // Try to use jSquash WASM encoder (much faster)
+  const encode = await initJSquash();
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  // Helper to encode at a given quality
+  const getEncoded = async (quality) => {
+    if (encode) {
+      // Use jSquash WASM encoder
+      const buffer = await encode(imageData, { quality });
+      return { data: buffer, size: buffer.byteLength / 1000, quality };
+    } else {
+      // Fallback to toBlob
+      return new Promise(resolve => {
+        canvas.toBlob(blob => {
+          resolve({ data: blob, size: blob.size / 1000, quality, isBlob: true });
+        }, imgType, quality / 100);
+      });
+    }
   };
 
   let iterations = 0;
-  let bestBlob = null;
+  let bestData = null;
   let bestQuality = 1;
+  let isBlob = false;
 
-  // First check if 100% quality fits
-  const maxResult = await getBlob(100);
-  iterations++;
+  // Phase 1: Coarse search with steps of 20 to find approximate range
+  log(`[${elapsed()}] Phase 1: Coarse search (100, 80, 60, 40, 20) ${encode ? '[WASM]' : '[toBlob]'}`);
 
-  if (maxResult.size <= targetSize) {
-    // Max quality fits, use it
-    bestBlob = maxResult.blob;
-    bestQuality = 100;
-  } else {
-    // Binary search between 1 and 100
-    let low = 1;
-    let high = 100;
+  let low = 1;
+  let high = 100;
 
-    while (high - low > 2) {
-      const mid = Math.floor((low + high) / 2);
-      const result = await getBlob(mid);
-      iterations++;
+  for (const q of [100, 80, 60, 40, 20]) {
+    const result = await getEncoded(q);
+    iterations++;
 
-      if (result.size <= targetSize) {
-        // This quality fits, try higher
-        bestBlob = result.blob;
-        bestQuality = mid;
-        low = mid + 1;
-      } else {
-        // Too big, need lower quality
-        high = mid - 1;
-      }
-    }
-
-    // Fine-tune: check remaining values in range
-    for (let q = high; q >= low; q--) {
-      const result = await getBlob(q);
-      iterations++;
-      if (result.size <= targetSize) {
-        bestBlob = result.blob;
-        bestQuality = q;
-        break;
-      }
-    }
-
-    // Fallback if nothing found yet
-    if (!bestBlob) {
-      const fallback = await getBlob(1);
-      bestBlob = fallback.blob;
-      bestQuality = 1;
-      iterations++;
+    if (result.size <= targetSize) {
+      log(`[${elapsed()}] #${iterations} quality=${q} -> ${result.size.toFixed(1)}KB ✓ FITS`);
+      bestData = result.data;
+      bestQuality = q;
+      isBlob = result.isBlob || false;
+      low = q;
+      break;
+    } else {
+      log(`[${elapsed()}] #${iterations} quality=${q} -> ${result.size.toFixed(1)}KB ✗ too big`);
+      high = q;
     }
   }
 
-  // Convert blob to data URL
-  const reader = new FileReader();
-  reader.onloadend = () => {
-    log(`Filesize optimization: quality=${bestQuality}, size=${(bestBlob.size / 1000).toFixed(1)}KB, iterations=${iterations}`);
-    callback(reader.result);
-  };
-  reader.readAsDataURL(bestBlob);
+  // If even quality 20 doesn't fit, search lower
+  if (!bestData) {
+    log(`[${elapsed()}] Quality 20 too big, searching 1-19`);
+    for (let q = 15; q >= 1; q -= 5) {
+      const result = await getEncoded(q);
+      iterations++;
+      if (result.size <= targetSize) {
+        log(`[${elapsed()}] #${iterations} quality=${q} -> ${result.size.toFixed(1)}KB ✓ FITS`);
+        bestData = result.data;
+        bestQuality = q;
+        isBlob = result.isBlob || false;
+        low = q;
+        high = q + 5;
+        break;
+      }
+    }
+    // Absolute fallback
+    if (!bestData) {
+      const fallback = await getEncoded(1);
+      iterations++;
+      bestData = fallback.data;
+      bestQuality = 1;
+      isBlob = fallback.isBlob || false;
+      log(`[${elapsed()}] #${iterations} Fallback to quality=1 -> ${fallback.size.toFixed(1)}KB`);
+    }
+  }
+
+  // Phase 2: Binary search within the narrowed range to maximize quality
+  if (high - low > 1) {
+    log(`[${elapsed()}] Phase 2: Fine search between ${low} and ${high}`);
+
+    while (high - low > 1) {
+      const mid = Math.floor((low + high) / 2);
+      const result = await getEncoded(mid);
+      iterations++;
+
+      if (result.size <= targetSize) {
+        log(`[${elapsed()}] #${iterations} quality=${mid} -> ${result.size.toFixed(1)}KB ✓ FITS`);
+        bestData = result.data;
+        bestQuality = mid;
+        isBlob = result.isBlob || false;
+        low = mid;
+      } else {
+        log(`[${elapsed()}] #${iterations} quality=${mid} -> ${result.size.toFixed(1)}KB ✗ too big`);
+        high = mid;
+      }
+    }
+  }
+
+  // Convert to data URL
+  const finalSize = isBlob ? bestData.size / 1000 : bestData.byteLength / 1000;
+
+  if (isBlob) {
+    // Blob from toBlob fallback
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      log(`[${elapsed()}] ✓ DONE: quality=${bestQuality}, size=${finalSize.toFixed(1)}KB, iterations=${iterations}`);
+      callback(reader.result);
+    };
+    reader.readAsDataURL(bestData);
+  } else {
+    // ArrayBuffer from jSquash
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(bestData)));
+    const dataURL = `data:image/jpeg;base64,${base64}`;
+    log(`[${elapsed()}] ✓ DONE: quality=${bestQuality}, size=${finalSize.toFixed(1)}KB, iterations=${iterations}`);
+    callback(dataURL);
+  }
 }
 
 function xyIsInImage(data, x, y, cw, ch, options) {
