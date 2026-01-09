@@ -135,7 +135,7 @@ DEFAULT_OPTIONS = {
   - Handles JPG quality/filesize optimization
   - Handles PNG output
 
-- `checkSize()` - Iteratively reduces quality to meet filesize target
+- `checkSize()` - Fast estimation-based quality finder for target filesize (typically 2-3 iterations)
 
 - `findEdge()` - Pixel analysis to find banner edge
 - `findBoundary()` - Calculates bounding box of detected banner
@@ -367,6 +367,13 @@ DEFAULT_OPTIONS = {
   - Using `Object.assign()` and array methods
 - Added toast notifications for success/error feedback
 - Created README.md for GitHub
+- Redesigned popup UI with modern white/black/gray color scheme
+- Used CSS custom properties for consistent theming
+- Improved filesize optimization performance:
+  - Replaced iterative quality reduction with estimation-based algorithm
+  - Uses JPEG compression heuristics (size ∝ quality^1.5)
+  - Typically completes in 2-3 iterations instead of many
+- Updated default maxFileSize from 39 to 49 KB
 
 ### Version 1.0
 - Migrated from Manifest V2 to Manifest V3
