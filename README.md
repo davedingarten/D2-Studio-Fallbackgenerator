@@ -7,6 +7,7 @@ A Chrome extension for creating fallback images from HTML5 banner ads. Capture s
 - **One-click capture** - Press `Cmd/Ctrl+Shift+S` to instantly capture a banner
 - **Smart detection** - Automatically detects banner dimensions using CSS selector, first div, or pixel analysis
 - **Image optimization** - Export as JPG (with quality/filesize control) or PNG
+- **Fast WASM encoding** - Uses MozJPEG via WebAssembly for 16x faster JPEG encoding
 - **Retina support** - Optional 2x output for high-DPI displays
 - **Auto-naming** - Filenames based on folder name and dimensions (e.g., `300x250.jpg`)
 - **Overwrite mode** - Automatically replaces previous captures with the same name
@@ -66,7 +67,8 @@ Click the extension icon to open settings:
 
 ## Development
 
-The extension uses modern JavaScript (ES6+) with no external dependencies except:
+The extension uses modern JavaScript (ES6+) with these dependencies:
+- **jSquash** - MozJPEG WASM encoder for fast, high-quality JPEG compression
 - **Mousetrap** - Keyboard shortcut handling
 - **canvas-to-blob** - Canvas polyfill for older browsers
 
@@ -75,9 +77,10 @@ The extension uses modern JavaScript (ES6+) with no external dependencies except
 ```
 ├── manifest.json      # Extension configuration
 ├── background.js      # Service worker
-├── offscreen.js       # Image processing (canvas operations)
+├── offscreen.js       # Image processing (WASM encoding)
 ├── content.js         # Page inspection & hotkey handling
 ├── popup.html/js      # Settings UI
+├── jsquash/           # MozJPEG WASM encoder
 └── icons/             # Extension icons
 ```
 
