@@ -25,7 +25,7 @@ const OPTIMIZING_MODES = [
 const DEFAULT_OPTIONS = {
   overwrite: true,
   optimizingMode: OPTIMIZING_MODES[0].type,
-  maxFileSize: 39,
+  maxFileSize: 49,
   saveAs: false,
   detectionId: '#banner',
   outputMode: OUTPUT_MODES[0].type,
