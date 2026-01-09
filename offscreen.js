@@ -139,9 +139,8 @@ function cropAndProcess(img, coords, options, effectivePixelRatio, resolve, reje
   }
 }
 
-// Fast estimation-based quality finder for target filesize
-// Uses mathematical estimation + fine-tuning (typically 2-3 iterations vs 7 for binary search)
-// Guarantees file will NOT exceed maxFileSize
+// Binary search to find highest quality that fits under maxFileSize
+// Guarantees file will NOT exceed maxFileSize while maximizing quality
 async function checkSize(canvas, _tempQuality, _security, imgType, options, callback) {
   const targetSize = options.maxFileSize;
 
@@ -158,75 +157,53 @@ async function checkSize(canvas, _tempQuality, _security, imgType, options, call
   let bestBlob = null;
   let bestQuality = 1;
 
-  // First: quick check at quality 85 (good balance point)
-  const sample = await getBlob(85);
+  // First check if 100% quality fits
+  const maxResult = await getBlob(100);
   iterations++;
 
-  if (sample.size <= targetSize) {
-    // 85% already fits - try 100%
-    const maxResult = await getBlob(100);
-    iterations++;
-    if (maxResult.size <= targetSize) {
-      bestBlob = maxResult.blob;
-      bestQuality = 100;
-    } else {
-      // Estimate between 85-100
-      const ratio = targetSize / sample.size;
-      const estimated = Math.min(99, Math.floor(85 + (15 * ratio)));
-      const estResult = await getBlob(estimated);
-      iterations++;
-      if (estResult.size <= targetSize) {
-        bestBlob = estResult.blob;
-        bestQuality = estimated;
-      } else {
-        bestBlob = sample.blob;
-        bestQuality = 85;
-      }
-    }
+  if (maxResult.size <= targetSize) {
+    // Max quality fits, use it
+    bestBlob = maxResult.blob;
+    bestQuality = 100;
   } else {
-    // Need lower quality - estimate based on ratio
-    // JPEG size roughly follows: size ∝ quality^1.5
-    const ratio = targetSize / sample.size;
-    const estimated = Math.max(1, Math.floor(85 * Math.pow(ratio, 0.7)));
+    // Binary search between 1 and 100
+    let low = 1;
+    let high = 100;
 
-    let result = await getBlob(estimated);
-    iterations++;
+    while (high - low > 2) {
+      const mid = Math.floor((low + high) / 2);
+      const result = await getBlob(mid);
+      iterations++;
 
-    if (result.size <= targetSize) {
-      // Good estimate, try slightly higher to maximize quality
-      bestBlob = result.blob;
-      bestQuality = result.quality;
-
-      // Try 10% higher quality
-      const higher = Math.min(84, estimated + Math.max(5, Math.floor(estimated * 0.15)));
-      if (higher > estimated) {
-        const higherResult = await getBlob(higher);
-        iterations++;
-        if (higherResult.size <= targetSize) {
-          bestBlob = higherResult.blob;
-          bestQuality = higher;
-        }
+      if (result.size <= targetSize) {
+        // This quality fits, try higher
+        bestBlob = result.blob;
+        bestQuality = mid;
+        low = mid + 1;
+      } else {
+        // Too big, need lower quality
+        high = mid - 1;
       }
-    } else {
-      // Estimate was too high, go lower
-      while (result.size > targetSize && result.quality > 1) {
-        const newQuality = Math.max(1, Math.floor(result.quality * 0.7));
-        result = await getBlob(newQuality);
-        iterations++;
-        if (iterations > 10) break; // Safety limit
-      }
-      bestBlob = result.blob;
-      bestQuality = result.quality;
     }
-  }
 
-  // Final safety: if still too big, step down until it fits
-  while (bestBlob && bestBlob.size / 1000 > targetSize && bestQuality > 1) {
-    bestQuality = Math.max(1, bestQuality - 5);
-    const finalResult = await getBlob(bestQuality);
-    bestBlob = finalResult.blob;
-    iterations++;
-    if (iterations > 15) break;
+    // Fine-tune: check remaining values in range
+    for (let q = high; q >= low; q--) {
+      const result = await getBlob(q);
+      iterations++;
+      if (result.size <= targetSize) {
+        bestBlob = result.blob;
+        bestQuality = q;
+        break;
+      }
+    }
+
+    // Fallback if nothing found yet
+    if (!bestBlob) {
+      const fallback = await getBlob(1);
+      bestBlob = fallback.blob;
+      bestQuality = 1;
+      iterations++;
+    }
   }
 
   // Convert blob to data URL
